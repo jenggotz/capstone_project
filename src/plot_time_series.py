@@ -12,34 +12,13 @@ import numpy as np
 import matplotlib.pyplot as plt   #Data visualisation libraries
 import matplotlib as mpl
 import seaborn as sns
-from statsmodels.graphics.tsaplots import plot_acf
-from statsmodels.tsa.seasonal import seasonal_decompose
 
-#file comes from by country initial analysis notebook (reduced to 19 countries)
+#using the final file with only 19 countries
 merged_file = pd.read_csv('.\Market_food_prices_w_temp_reduced.csv')
 merged_file = merged_file.sort_values('period')
 df = merged_file.groupby('country')
 idx = df.nth(1).index
 plt.rcParams["figure.figsize"] = [16, 12]
-
-
-#plot time series based on commodity
-print('plotting timeseries commodity...')
-for i in range(len(idx.tolist())):
-    plt.figure()
-    df = merged_file[(merged_file['country'] == idx.tolist()[i])]
-    df['period'] = pd.to_datetime(df.period, format='%Y-%m-%d')
-    df = df.groupby(['period', 'commodity_purchased'])['price_in_USD'].mean().reset_index()
-    df.set_index('period', inplace=True)
-    commodity = df.commodity_purchased.unique()
-    for v in range(len(commodity)):
-        food = df[(df['commodity_purchased'] == commodity[v])]
-        food.price_in_USD.plot()
-    plt.legend(commodity)
-    plt.xticks(rotation=45)
-    plt.title("Plot of Commodity", fontsize=20)
-    fig = plt.gcf()
-    fig.savefig('./plot-timeseries-commodity/'+ idx.tolist()[i] + '.png')
 
 #timeseries plot based on avg temp
 print('plotting timeseries avg temp...')
@@ -161,6 +140,7 @@ for i in range(len(idx.tolist())):
     fig = plt.gcf()
     fig.savefig('./plot-scatterplot/'+ idx.tolist()[i] + '.png')
 
+#boxplots for avg temp and food prices in 1 plot
 print('plotting boxplot...')
 for i in range(len(idx.tolist())):
     plt.figure()
@@ -176,51 +156,3 @@ for i in range(len(idx.tolist())):
 
     fig = plt.gcf()
     fig.savefig('./plot-all-variables/boxplot/'+ idx.tolist()[i] + '.png')
-
-#plot time series trend for the numeric variables
-print('plotting timeseries prices acf...')
-for i in range(len(idx.tolist())):
-    plt.figure()
-    df = merged_file[(merged_file['country'] == idx.tolist()[i])]
-    df = df.groupby('period')['price_in_USD'].mean().reset_index()
-    df.set_index('period', inplace=True)
-    plot_acf(df, lags=50)
-    fig = plt.gcf()
-    fig.savefig('./plot-timeseries-foodprices/acf/'+ idx.tolist()[i] + '.png')
-
-#plot time series trend for the numeric variables
-print('plotting timeseries avg temp acf...')
-for i in range(len(idx.tolist())):
-    plt.figure()
-    df = merged_file[(merged_file['country'] == idx.tolist()[i])]
-    df = df.groupby('period')['avg_temp'].mean().reset_index()
-    df.set_index('period', inplace=True)
-    plot_acf(df, lags=50)
-    fig = plt.gcf()
-    fig.savefig('./plot-timeseries-avgtemp/acf/'+ idx.tolist()[i] + '.png')
-
-#plot time series trend for the numeric variables
-print('plotting timeseries food prices seasonal decompose...')
-for i in range(len(idx.tolist())):
-    plt.figure()
-    df = merged_file[(merged_file['country'] == idx.tolist()[i])]
-    df['period'] = pd.to_datetime(df.period, format='%Y-%m-%d')
-    df = df.groupby(['period'])['price_in_USD'].mean().reset_index()
-    df.set_index('period', inplace=True)
-    result = seasonal_decompose(df, model='additive', freq=12)
-    result.plot()
-    fig = plt.gcf()
-    fig.savefig('./seasonal_decompose/food prices/'+ idx.tolist()[i] + '.png')
-
-#plot time series trend for the numeric variables
-print('plotting timeseries avg temp seasonal decompose...')
-for i in range(len(idx.tolist())):
-    plt.figure()
-    df = merged_file[(merged_file['country'] == idx.tolist()[i])]
-    df['period'] = pd.to_datetime(df.period, format='%Y-%m-%d')
-    df = df.groupby(['period'])['avg_temp'].mean().reset_index()
-    df.set_index('period', inplace=True)
-    result = seasonal_decompose(df, model='additive', freq=12)
-    result.plot()
-    fig = plt.gcf()
-    fig.savefig('./seasonal_decompose/avg_temp/'+ idx.tolist()[i] + '.png')
