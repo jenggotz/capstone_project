@@ -22,6 +22,7 @@ df = merged_file.groupby('country')
 idx = df.nth(1).index
 plt.rcParams["figure.figsize"] = [16, 12]
 
+
 #plot time series based on commodity
 print('plotting timeseries commodity...')
 for i in range(len(idx.tolist())):
@@ -199,20 +200,20 @@ for i in range(len(idx.tolist())):
     fig.savefig('./plot-timeseries-avgtemp/acf/'+ idx.tolist()[i] + '.png')
 
 #plot time series trend for the numeric variables
-print('plotting timeseries food prices acf...')
+print('plotting timeseries food prices seasonal decompose...')
 for i in range(len(idx.tolist())):
     plt.figure()
     df = merged_file[(merged_file['country'] == idx.tolist()[i])]
     df['period'] = pd.to_datetime(df.period, format='%Y-%m-%d')
     df = df.groupby(['period'])['price_in_USD'].mean().reset_index()
     df.set_index('period', inplace=True)
-    result = seasonal_decompose(df, model='multiplicative', freq=12)
+    result = seasonal_decompose(df, model='additive', freq=12)
     result.plot()
     fig = plt.gcf()
     fig.savefig('./seasonal_decompose/food prices/'+ idx.tolist()[i] + '.png')
 
 #plot time series trend for the numeric variables
-print('plotting timeseries avg temp acf...')
+print('plotting timeseries avg temp seasonal decompose...')
 for i in range(len(idx.tolist())):
     plt.figure()
     df = merged_file[(merged_file['country'] == idx.tolist()[i])]
