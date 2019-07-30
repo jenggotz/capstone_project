@@ -19,6 +19,10 @@ def mean_absolute_percentage_error(y_true, y_pred):
     y_true, y_pred = np.array(y_true), np.array(y_pred)
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
+def percentage_error_to_mean(y_true_mean, rmse):
+    pem = (rmse/y_true_mean)
+    return pem * 100
+
 def make_stationary(df_country, value, log, split):
     df_country['period'] = pd.to_datetime(df_country.period, format='%Y-%m-%d')
     df_country.set_index('period', inplace=True)
@@ -136,8 +140,6 @@ def auto_arima_model(train, test, value, path, filename, sea_val, full, difftype
     model_arima.fit(train)
     forecast = model_arima.predict(n_periods=len(test))
     forecast = pd.DataFrame(forecast, index=test.index, columns=['Prediction'])
-    rmse = sqrt(mean_squared_error(test, forecast))
-    mape = mean_absolute_percentage_error(test, forecast)
 
     #reverse based on original values
     if (difftype =='log'):
@@ -153,13 +155,16 @@ def auto_arima_model(train, test, value, path, filename, sea_val, full, difftype
         test_orig = test.copy()
         forecast_orig = forecast.copy()
 
+    rmse = sqrt(mean_squared_error(test_orig, forecast_orig))
+    mape = mean_absolute_percentage_error(test_orig, forecast_orig)
+    pce = percentage_error_to_mean(np.mean(test_orig)[0], rmse)
+
     #plot
     plt.figure()
     plt.figtext(.2,.15, 'rmse=%f' % (rmse))
-    # plt.plot(train_orig, label='train set', color='blue')
     plt.plot(test_orig, label='test set', color='blue')
     plt.plot(forecast_orig, label='prediction', color='red')
-    plt.title('Auto Arima Modeling - After Transformation')
+    plt.title('Auto Arima Modeling - Actual vs Predict ' + value)
     plt.xlabel('period')
     plt.ylabel(path)
     plt.legend()
@@ -178,7 +183,7 @@ def auto_arima_model(train, test, value, path, filename, sea_val, full, difftype
     plt.figure()
     plt.plot(future, label='future', color='orange')
     plt.plot(full, label='past', color='blue')
-    plt.title('Auto Arima Modeling - Future')
+    plt.title('Auto Arima Modeling - Future ' + value)
     plt.xlabel('period')
     plt.legend()
     fig = plt.gcf()
@@ -208,7 +213,7 @@ def auto_arima_model(train, test, value, path, filename, sea_val, full, difftype
     plt.figtext(.2,.15, 'mean diff= ' + str(mean_ARIMA))
     plt.plot(future_orig, label='future', color='orange')
     plt.plot(full_orig, label='past', color='blue')
-    plt.title('Auto Arima Modeling - Future')
+    plt.title('Auto Arima Modeling - Future ' + value)
     plt.xlabel('period')
     plt.legend()
     fig = plt.gcf()
@@ -219,11 +224,13 @@ def auto_arima_model(train, test, value, path, filename, sea_val, full, difftype
 #fitting the model using VAR
 def var_model(train, test, value, full, difftype_price, df_log, train_before, test_before):
     model_var = VAR(endog=train, exog=train['avg_temp'])
+    # model_var = VAR(endog=train)
     model_fit = model_var.fit()
     print(model_fit.summary(), file=text_file1)
 
     cols = train.columns
     prediction = model_fit.forecast(model_fit.y, steps=len(test), exog_future=test['avg_temp'])
+    # prediction = model_fit.forecast(model_fit.y, steps=len(test))
 
     #converting predictions to dataframe
     pred = pd.DataFrame(index=range(0, len(prediction)), columns=[cols])
@@ -448,21 +455,22 @@ def var_model(train, test, value, full, difftype_price, df_log, train_before, te
         test_orig['price_in_USD'] = test['price_in_USD']
 
     #check errors
-    rmse = sqrt(mean_squared_error(test, pred))
-    for i in cols:
-        print('RMSE value for', i, 'is : ', sqrt(mean_squared_error(test[i], pred[i])), file=text_file1)
-        print('MAE value for', i, 'is : ', mean_absolute_error(test[i], pred[i]), file=text_file1)
-        print('MAPE value for', i, 'is : ', mean_absolute_percentage_error(test[i], pred[i]), file=text_file1)
+    rmse = sqrt(mean_squared_error(test_orig, pred_orig))
+    mape = mean_absolute_percentage_error(test_orig, pred_orig)
+    pce = percentage_error_to_mean(np.mean(test_orig)[0], rmse)
+    print('RMSE value for food prices is : ', sqrt(mean_squared_error(test_orig, pred_orig)), file=text_file1)
+    print('MAE value for food prices is : ', mean_absolute_error(test_orig, pred_orig), file=text_file1)
+    print('MAPE value for food prices is : ', mean_absolute_percentage_error(test_orig, pred_orig), file=text_file1)
 
+    #rename
     pred_orig.columns=['price_in_USD-pred']
     test_orig.columns = ['price_in_USD-test']
 
     plt.figure()
     plt.figtext(.2,.15, 'rmse=%f' % (rmse))
-    # plt.plot(train_orig['price_in_USD'], label='train set', color='seagreen')
     plt.plot(test_orig['price_in_USD-test'], label='test set', color='blue')
     plt.plot(pred_orig['price_in_USD-pred'], label='prediction', color='red')
-    plt.title('VAR Modeling - After Transformation')
+    plt.title('VAR Modeling - Actual vs Predict ' + value)
     plt.xlabel('period')
     plt.legend()
     fig = plt.gcf()
@@ -494,9 +502,10 @@ def var_model(train, test, value, full, difftype_price, df_log, train_before, te
             future.iloc[i][j] = future_val[i][j]
 
     plt.figure()
+    plt.figtext(.5,.20,  value)
     plt.plot(future['price_in_USD'], label='future', color='red')
     plt.plot(full ['price_in_USD'], label='past', color='blue')
-    plt.title('VAR Modeling - Future')
+    plt.title('VAR Modeling - Future ' + value)
     plt.xlabel('period')
     plt.legend()
     fig = plt.gcf()
@@ -651,7 +660,7 @@ def var_model(train, test, value, full, difftype_price, df_log, train_before, te
     plt.figtext(.2,.15, 'mean diff=%f' % mean_VAR)
     plt.plot(future_orig['price_in_USD'], label='future', color='red')
     plt.plot(full_orig['price_in_USD'], label='past', color='blue')
-    plt.title('VAR Modeling - Future')
+    plt.title('VAR Modeling - Future ' + value)
     plt.xlabel('period')
     plt.legend()
     fig = plt.gcf()
@@ -682,16 +691,18 @@ def lstm_model(train_X, train_y, test_X, test_y, value):
     inv_y = inv_y[:, 0]
 
     #plot prediction and actual data
-    rmse = sqrt(mean_squared_error(inv_y, inv_yhat))
-    mape = mean_absolute_percentage_error(inv_y, inv_yhat)
+    rmse = sqrt(mean_squared_error(test_y, yhat))
+    mape = mean_absolute_percentage_error(test_y, yhat)
+    pce = percentage_error_to_mean(np.mean(test_y), rmse)
     print('RMSE :' + str(rmse), file=text_file6)
     print('MAPE :' + str(mape), file=text_file6)
     plt.figure()
     plt.figtext(.2,.15, 'rmse=%f' % (rmse))
-    plt.plot(test_y, color='blue', label='test set')
-    plt.plot(yhat, color='red', label='prediction')
+    plt.plot(inv_y, color='blue', label='test set')
+    plt.plot(inv_yhat, color='red', label='prediction')
     plt.xlabel('Period')
     plt.ylabel('Food Price')
+    plt.title('LSTM modeling - Actual vs Predict '+ value)
     plt.legend()
     fig = plt.gcf()
     fig.savefig('./plot-lstm-model/transformed/pred/'+ value + '.png')
@@ -776,8 +787,6 @@ for key, value in country_dict.items():
         difftype = 'log'
     #call auto arima modeling
     mean_diff, rmse_temp_ARIMA = auto_arima_model(df_transform_temp, df_test_temp, value, 'avgtemp', text_file4, True, df_temp_full, difftype, lam)
-    list.at[key , 'mean_diff_ARIMA_temp'] = mean_diff
-    list.at[key, 'rmse_temp_ARIMA'] = rmse_temp_ARIMA
 
     #food prices
     df_prices = df_country.groupby('period')['price_in_USD'].mean().reset_index()
@@ -800,7 +809,7 @@ for key, value in country_dict.items():
     mean_diff, rmse_prices_ARIMA = auto_arima_model(df_transform_prices, df_test_prices, value, 'foodprices', text_file5, False, df_prices_full, difftype, lam)
     list.at[key , 'mean_diff_ARIMA_prices'] = mean_diff
     list.at[key, 'rmse_prices_ARIMA'] = rmse_prices_ARIMA
-    #
+
     #making the series stationary for VAR
     df_full_var = df_country_merge.copy()
     df_train_3, df_test_3 = split_data(df_country_merge, 'Y')
@@ -874,16 +883,15 @@ for key, value in country_dict.items():
     reframed = series_to_supervise(scaled, 1, 1)
     reframed.drop(reframed.columns[[0]], axis=1, inplace=True)
     df_test_4 = reframed.values
+
     train_X, train_y = df_train_4[:, :-1], df_train_4[:, -1]
     test_X, test_y = df_test_4[:, :-1], df_test_4[:, -1]
     train_X = train_X.reshape((train_X.shape[0], 1, train_X.shape[1]))
     test_X = test_X.reshape((test_X.shape[0], 1, test_X.shape[1]))
-    rmse_LSTM = lstm_model(train_X, train_y, test_X, test_y, value)
+    rmse_LSTM  = lstm_model(train_X, train_y, test_X, test_y, value)
 
-    list.at[key, 'dataset size'] = len(df_orig1)
     list.at[key, 'rmse_LSTM'] = rmse_LSTM
+    list.at[key, 'dataset size'] = len(df_orig1)
 
 #write foreasting summary
-# list = list['country'].replace('', np.nan, inplace=True)
-# list = list.dropna()
 list.to_csv(text_file8, index=False)
